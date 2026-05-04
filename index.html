@@ -106,16 +106,17 @@
     position: fixed;
     bottom: 24px; left: 50%; transform: translateX(-50%);
     z-index: 200;
-    display: flex; align-items: center; gap: 20px;
+    display: flex; align-items: center; gap: 16px;
     background: var(--panel-bg);
     backdrop-filter: blur(24px);
     -webkit-backdrop-filter: blur(24px);
     border: 1px solid var(--panel-border);
     border-radius: 14px;
-    padding: 12px 24px;
+    padding: 12px 20px;
     box-shadow: 0 8px 32px rgba(0,0,0,0.4);
     opacity: 0; visibility: hidden;
     transition: opacity 0.4s, visibility 0.4s;
+    max-width: calc(100vw - 32px);
   }
   #controls.visible { opacity: 1; visibility: visible; }
 
@@ -130,13 +131,13 @@
 
   .ctrl-group input[type="range"] {
     -webkit-appearance: none; appearance: none;
-    width: 100px; height: 4px;
+    width: 90px; height: 4px;
     background: rgba(255,255,255,0.12);
     border-radius: 2px; outline: none;
   }
   .ctrl-group input[type="range"]::-webkit-slider-thumb {
     -webkit-appearance: none; appearance: none;
-    width: 14px; height: 14px;
+    width: 18px; height: 18px;
     border-radius: 50%;
     background: var(--accent);
     cursor: pointer;
@@ -148,32 +149,36 @@
     border: 1px solid rgba(255,255,255,0.1);
     color: var(--accent);
     font-size: 12px; font-weight: 500;
-    padding: 6px 14px;
+    padding: 8px 14px;
     border-radius: 8px;
     cursor: pointer;
     transition: background 0.15s;
     white-space: nowrap;
     display: flex; align-items: center; gap: 6px;
+    -webkit-tap-highlight-color: transparent;
   }
   .ctrl-btn:hover { background: rgba(255,255,255,0.14); }
+  .ctrl-btn:active { background: rgba(255,255,255,0.2); }
   .ctrl-btn:disabled { opacity: 0.4; cursor: default; }
   .ctrl-btn svg { flex-shrink: 0; }
 
   .divider {
     width: 1px; height: 24px;
     background: rgba(255,255,255,0.1);
+    flex-shrink: 0;
   }
 
   /* ── Image count badge ── */
   #img-count {
     font-size: 11px; color: var(--accent-dim);
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
 
   /* ── Background color picker ── */
   .bg-color-btn {
     position: relative;
-    padding: 6px 12px;
+    padding: 8px 12px;
   }
   .bg-color-swatch {
     width: 16px; height: 16px;
@@ -187,6 +192,66 @@
     position: absolute; inset: 0;
     opacity: 0; cursor: pointer;
     width: 100%; height: 100%;
+  }
+
+  /* Row wrappers — transparent on desktop, structured on mobile */
+  .ctrl-row-sliders,
+  .ctrl-row-btns {
+    display: contents; /* flatten into parent flex on desktop */
+  }
+  .sr-only { display: none; }
+
+  /* ── Mobile ── */
+  @media (max-width: 600px) {
+    #controls {
+      bottom: 0; left: 0; right: 0;
+      transform: none;
+      border-radius: 16px 16px 0 0;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 12px;
+      padding: 16px 20px calc(16px + env(safe-area-inset-bottom));
+      max-width: 100vw;
+    }
+
+    /* Row 1: sliders */
+    .ctrl-row-sliders {
+      display: flex; align-items: center; gap: 20px;
+    }
+    .ctrl-row-sliders .ctrl-group {
+      flex: 1;
+    }
+    .ctrl-row-sliders .ctrl-group input[type="range"] {
+      flex: 1; width: 0; min-width: 0;
+    }
+    .ctrl-row-sliders .divider { display: none; }
+
+    /* Row 2: buttons */
+    .ctrl-row-btns {
+      display: flex; align-items: center; gap: 8px;
+    }
+    .ctrl-row-btns .ctrl-btn {
+      flex: 1; justify-content: center;
+      padding: 10px 8px;
+      font-size: 13px;
+    }
+    .ctrl-row-btns #img-count { display: none; }
+
+    /* Hide hex label on mobile, keep swatch */
+    #bg-color-label { display: none; }
+
+    /* Desktop-only dividers */
+    .divider-desktop { display: none; }
+
+    /* Bigger tap targets for range thumbs */
+    .ctrl-group input[type="range"] { height: 6px; }
+    .ctrl-group input[type="range"]::-webkit-slider-thumb {
+      width: 22px; height: 22px;
+    }
+
+    /* Upload screen */
+    .drop-zone { width: calc(100vw - 48px); height: 180px; }
+    #upload-screen h1 { font-size: 22px; }
   }
 
   /* ── Hidden file input ── */
@@ -214,45 +279,44 @@
 
 <!-- Controls -->
 <div id="controls">
-  <div class="ctrl-group">
-    <label>Chaos</label>
-    <input type="range" id="chaos-slider" min="0" max="100" value="30">
+  <!-- Row 1: sliders (stacks on mobile) -->
+  <div class="ctrl-row-sliders">
+    <div class="ctrl-group">
+      <label>Chaos</label>
+      <input type="range" id="chaos-slider" min="0" max="100" value="30">
+    </div>
+    <div class="divider"></div>
+    <div class="ctrl-group">
+      <label>Gap</label>
+      <input type="range" id="gap-slider" min="0" max="24" value="4">
+    </div>
   </div>
 
-  <div class="divider"></div>
+  <div class="divider divider-desktop"></div>
 
-  <div class="ctrl-group">
-    <label>Gap</label>
-    <input type="range" id="gap-slider" min="0" max="24" value="4">
-  </div>
-
-  <div class="divider"></div>
-
-  <div class="ctrl-group">
-    <label>BG</label>
-    <button class="ctrl-btn bg-color-btn" id="bg-color-btn">
-      <div class="bg-color-swatch" id="bg-color-swatch"></div>
-      <span id="bg-color-label">#1a1a1a</span>
-      <input type="color" id="bg-color-input" value="#1a1a1a">
+  <!-- Row 2: action buttons -->
+  <div class="ctrl-row-btns">
+    <div class="ctrl-group">
+      <label class="sr-only">BG</label>
+      <button class="ctrl-btn bg-color-btn" id="bg-color-btn">
+        <div class="bg-color-swatch" id="bg-color-swatch"></div>
+        <span id="bg-color-label">#1a1a1a</span>
+        <input type="color" id="bg-color-input" value="#1a1a1a">
+      </button>
+    </div>
+    <button class="ctrl-btn" id="shuffle-btn">Shuffle</button>
+    <button class="ctrl-btn" id="add-btn">+ Add</button>
+    <button class="ctrl-btn" id="download-btn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/>
+        <line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+      Export
     </button>
+    <div class="divider divider-desktop"></div>
+    <span id="img-count">0 images</span>
   </div>
-
-  <div class="divider"></div>
-
-  <button class="ctrl-btn" id="shuffle-btn">Shuffle</button>
-  <button class="ctrl-btn" id="add-btn">+ Add</button>
-  <button class="ctrl-btn" id="download-btn">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-      <polyline points="7 10 12 15 17 10"/>
-      <line x1="12" y1="15" x2="12" y2="3"/>
-    </svg>
-    Export
-  </button>
-
-  <div class="divider"></div>
-
-  <span id="img-count">0 images</span>
 </div>
 
 <input type="file" id="file-input" multiple accept="image/*">
