@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Moodboard</title>
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --gap: 4px;
+    --bg: #1a1a1a;
+    --panel-bg: rgba(28, 28, 30, 0.92);
+    --panel-border: rgba(255,255,255,0.08);
+    --accent: #e8e8e8;
+    --accent-dim: #888;
+    --radius: 10px;
+  }
+
+  html, body {
+    height: 100%; width: 100%;
+    background: var(--bg);
+    font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+    color: var(--accent);
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* ── Upload screen ── */
+  #upload-screen {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 100;
+    transition: opacity 0.4s, visibility 0.4s;
+  }
+  #upload-screen.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+
+  #upload-screen h1 {
+    font-size: 28px; font-weight: 600; letter-spacing: -0.5px;
+    margin-bottom: 8px;
+  }
+  #upload-screen p {
+    font-size: 14px; color: var(--accent-dim); margin-bottom: 32px;
+  }
+
+  .drop-zone {
+    width: 420px; height: 240px;
+    border: 2px dashed rgba(255,255,255,0.15);
+    border-radius: 16px;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .drop-zone:hover, .drop-zone.drag-over {
+    border-color: rgba(255,255,255,0.4);
+    background: rgba(255,255,255,0.03);
+  }
+  .drop-zone svg { margin-bottom: 16px; opacity: 0.4; }
+  .drop-zone span { font-size: 14px; color: var(--accent-dim); }
+  .drop-zone .browse { color: var(--accent); text-decoration: underline; cursor: pointer; }
+
+  /* ── Mosaic viewport ── */
+  #mosaic {
+    position: fixed; inset: 0;
+    overflow: hidden;
+  }
+
+  .tile {
+    position: absolute;
+    overflow: hidden;
+    transition: left 0.5s cubic-bezier(.4,0,.2,1),
+                top 0.5s cubic-bezier(.4,0,.2,1),
+                width 0.5s cubic-bezier(.4,0,.2,1),
+                height 0.5s cubic-bezier(.4,0,.2,1);
+  }
+
+  .tile img {
+    position: absolute;
+    width: 100%; height: 100%;
+    object-fit: cover;
+    pointer-events: none;
+    transition: object-position 0.15s ease-out;
+  }
+
+  .tile .drag-handle {
+    position: absolute; inset: 0;
+    cursor: grab;
+    z-index: 2;
+  }
+  .tile .drag-handle:active { cursor: grabbing; }
+
+  /* subtle vignette on each tile */
+  .tile::after {
+    content: '';
+    position: absolute; inset: 0;
+    box-shadow: inset 0 0 30px rgba(0,0,0,0.08);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* ── Controls panel ── */
+  #controls {
+    position: fixed;
+    bottom: 24px; left: 50%; transform: translateX(-50%);
+    z-index: 200;
+    display: flex; align-items: center; gap: 20px;
+    background: var(--panel-bg);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid var(--panel-border);
+    border-radius: 14px;
+    padding: 12px 24px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    opacity: 0; visibility: hidden;
+    transition: opacity 0.4s, visibility 0.4s;
+  }
+  #controls.visible { opacity: 1; visibility: visible; }
+
+  .ctrl-group {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .ctrl-group label {
+    font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.6px; color: var(--accent-dim);
+    white-space: nowrap;
+  }
+
+  .ctrl-group input[type="range"] {
+    -webkit-appearance: none; appearance: none;
+    width: 100px; height: 4px;
+    background: rgba(255,255,255,0.12);
+    border-radius: 2px; outline: none;
+  }
+  .ctrl-group input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: none;
+  }
+
+  .ctrl-btn {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: var(--accent);
+    font-size: 12px; font-weight: 500;
+    padding: 6px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s;
+    white-space: nowrap;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .ctrl-btn:hover { background: rgba(255,255,255,0.14); }
+  .ctrl-btn:disabled { opacity: 0.4; cursor: default; }
+  .ctrl-btn svg { flex-shrink: 0; }
+
+  .divider {
+    width: 1px; height: 24px;
+    background: rgba(255,255,255,0.1);
+  }
+
+  /* ── Image count badge ── */
+  #img-count {
+    font-size: 11px; color: var(--accent-dim);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── Background color picker ── */
+  .bg-color-btn {
+    position: relative;
+    padding: 6px 12px;
+  }
+  .bg-color-swatch {
+    width: 16px; height: 16px;
+    border-radius: 4px;
+    border: 1px solid rgba(255,255,255,0.2);
+    flex-shrink: 0;
+    transition: border-color 0.15s;
+  }
+  .bg-color-btn:hover .bg-color-swatch { border-color: rgba(255,255,255,0.5); }
+  #bg-color-input {
+    position: absolute; inset: 0;
+    opacity: 0; cursor: pointer;
+    width: 100%; height: 100%;
+  }
+
+  /* ── Hidden file input ── */
+  #file-input { display: none; }
+</style>
+</head>
+<body>
+
+<!-- Upload screen -->
+<div id="upload-screen">
+  <h1>Moodboard</h1>
+  <p>Drop images to create your mosaic</p>
+  <div class="drop-zone" id="drop-zone">
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+      <polyline points="17 8 12 3 7 8"/>
+      <line x1="12" y1="3" x2="12" y2="15"/>
+    </svg>
+    <span>Drag & drop or <span class="browse">browse</span></span>
+  </div>
+</div>
+
+<!-- Mosaic viewport -->
+<div id="mosaic"></div>
+
+<!-- Controls -->
+<div id="controls">
+  <div class="ctrl-group">
+    <label>Chaos</label>
+    <input type="range" id="chaos-slider" min="0" max="100" value="30">
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="ctrl-group">
+    <label>Gap</label>
+    <input type="range" id="gap-slider" min="0" max="24" value="4">
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="ctrl-group">
+    <label>BG</label>
+    <button class="ctrl-btn bg-color-btn" id="bg-color-btn">
+      <div class="bg-color-swatch" id="bg-color-swatch"></div>
+      <span id="bg-color-label">#1a1a1a</span>
+      <input type="color" id="bg-color-input" value="#1a1a1a">
+    </button>
+  </div>
+
+  <div class="divider"></div>
+
+  <button class="ctrl-btn" id="shuffle-btn">Shuffle</button>
+  <button class="ctrl-btn" id="add-btn">+ Add</button>
+  <button class="ctrl-btn" id="download-btn">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+      <polyline points="7 10 12 15 17 10"/>
+      <line x1="12" y1="15" x2="12" y2="3"/>
+    </svg>
+    Export
+  </button>
+
+  <div class="divider"></div>
+
+  <span id="img-count">0 images</span>
+</div>
+
+<input type="file" id="file-input" multiple accept="image/*">
+
+<script>
+(() => {
+  // ── State ──
+  const images = []; // { id, url, naturalW, naturalH, aspect, panX, panY }
+  let chaos = 0.3;
+  let gap = 4;
+  let layoutOrder = []; // indices into images[], shuffled
+
+  const mosaic = document.getElementById('mosaic');
+  const controls = document.getElementById('controls');
+  const uploadScreen = document.getElementById('upload-screen');
+  const dropZone = document.getElementById('drop-zone');
+  const fileInput = document.getElementById('file-input');
+  const chaosSlider = document.getElementById('chaos-slider');
+  const gapSlider = document.getElementById('gap-slider');
+  const shuffleBtn = document.getElementById('shuffle-btn');
+  const addBtn = document.getElementById('add-btn');
+  const downloadBtn = document.getElementById('download-btn');
+  const bgColorInput = document.getElementById('bg-color-input');
+  const bgColorSwatch = document.getElementById('bg-color-swatch');
+  const bgColorLabel = document.getElementById('bg-color-label');
+  const imgCount = document.getElementById('img-count');
+
+  let bgColor = '#1a1a1a';
+  bgColorSwatch.style.background = bgColor;
+
+  // ── File handling ──
+  function handleFiles(files) {
+    const imageFiles = [...files].filter(f => f.type.startsWith('image/'));
+    if (!imageFiles.length) return;
+
+    let loaded = 0;
+    imageFiles.forEach(file => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        images.push({
+          id: crypto.randomUUID(),
+          url,
+          naturalW: img.naturalWidth,
+          naturalH: img.naturalHeight,
+          aspect: img.naturalWidth / img.naturalHeight,
+          panX: 50,
+          panY: 50,
+        });
+        loaded++;
+        if (loaded === imageFiles.length) {
+          onImagesChanged();
+        }
+      };
+      img.src = url;
+    });
+  }
+
+  function onImagesChanged() {
+    layoutOrder = images.map((_, i) => i);
+    shuffleArray(layoutOrder);
+    uploadScreen.classList.add('hidden');
+    controls.classList.add('visible');
+    render();
+    updateCount();
+  }
+
+  function updateCount() {
+    imgCount.textContent = `${images.length} image${images.length !== 1 ? 's' : ''}`;
+  }
+
+  // ── Mosaic layout algorithm ──
+  // Binary space partition treemap that respects aspect ratios
+  function computeLayout() {
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    if (!images.length) return [];
+
+    const ordered = layoutOrder.map(i => images[i]);
+    const tiles = [];
+    subdivide(ordered, 0, 0, W, H, tiles, 0);
+    return tiles;
+  }
+
+  function subdivide(imgs, x, y, w, h, out, depth) {
+    if (imgs.length === 0) return;
+    if (imgs.length === 1) {
+      out.push({ img: imgs[0], x, y, w, h });
+      return;
+    }
+
+    // Decide split direction
+    const rectAspect = w / h;
+    // Bias toward splitting the longer axis, chaos adds randomness
+    let splitHorizontal;
+    if (chaos < 0.01) {
+      splitHorizontal = rectAspect < 1;
+    } else {
+      const bias = rectAspect < 1 ? 0.7 : 0.3; // probability of horizontal split
+      const noisyBias = bias + (Math.random() - 0.5) * chaos * 1.4;
+      splitHorizontal = Math.random() < noisyBias;
+    }
+
+    // Decide split point
+    const splitIndex = findSplitIndex(imgs, splitHorizontal, w, h);
+    const groupA = imgs.slice(0, splitIndex);
+    const groupB = imgs.slice(splitIndex);
+
+    // Compute ideal ratio based on total "area weight" of each group
+    const weightA = groupA.reduce((s, im) => s + areaWeight(im, splitHorizontal), 0);
+    const weightB = groupB.reduce((s, im) => s + areaWeight(im, splitHorizontal), 0);
+    let ratio = weightA / (weightA + weightB);
+
+    // Add chaos noise to ratio
+    ratio += (Math.random() - 0.5) * chaos * 0.35;
+    ratio = Math.max(0.15, Math.min(0.85, ratio));
+
+    const g = gap;
+    if (splitHorizontal) {
+      const splitY = y + h * ratio;
+      subdivide(groupA, x, y, w, splitY - y - g / 2, out, depth + 1);
+      subdivide(groupB, x, splitY + g / 2, w, y + h - splitY - g / 2, out, depth + 1);
+    } else {
+      const splitX = x + w * ratio;
+      subdivide(groupA, x, y, splitX - x - g / 2, h, out, depth + 1);
+      subdivide(groupB, splitX + g / 2, y, x + w - splitX - g / 2, h, out, depth + 1);
+    }
+  }
+
+  function areaWeight(img, horizontal) {
+    // Weight based on aspect ratio preference
+    // For horizontal splits (stacking vertically), wider images need more vertical space
+    // For vertical splits (side by side), taller images need more horizontal space
+    if (horizontal) {
+      return 1 / img.aspect; // taller images get more weight for vertical stacking
+    }
+    return img.aspect; // wider images get more weight for horizontal stacking
+  }
+
+  function findSplitIndex(imgs, horizontal, w, h) {
+    // Try to find the most balanced split by cumulative aspect weight
+    if (imgs.length === 2) return 1;
+
+    const totalWeight = imgs.reduce((s, im) => s + areaWeight(im, horizontal), 0);
+    let cumWeight = 0;
+    let bestIndex = 1;
+    let bestDiff = Infinity;
+
+    for (let i = 0; i < imgs.length - 1; i++) {
+      cumWeight += areaWeight(imgs[i], horizontal);
+      const diff = Math.abs(cumWeight / totalWeight - 0.5);
+      // Chaos makes us less picky about balance
+      const noisyDiff = diff + (Math.random() - 0.5) * chaos * 0.3;
+      if (noisyDiff < bestDiff) {
+        bestDiff = noisyDiff;
+        bestIndex = i + 1;
+      }
+    }
+    return bestIndex;
+  }
+
+  // ── Rendering ──
+  function render() {
+    const tiles = computeLayout();
+    const existingEls = mosaic.querySelectorAll('.tile');
+    const elMap = {};
+    existingEls.forEach(el => { elMap[el.dataset.id] = el; });
+
+    const usedIds = new Set();
+
+    tiles.forEach(tile => {
+      const id = tile.img.id;
+      usedIds.add(id);
+      let el = elMap[id];
+
+      if (!el) {
+        el = document.createElement('div');
+        el.className = 'tile';
+        el.dataset.id = id;
+
+        const imgEl = document.createElement('img');
+        imgEl.src = tile.img.url;
+        imgEl.draggable = false;
+
+        const handle = document.createElement('div');
+        handle.className = 'drag-handle';
+
+        el.appendChild(imgEl);
+        el.appendChild(handle);
+        mosaic.appendChild(el);
+
+        setupPan(el, tile.img);
+      }
+
+      el.style.left = tile.x + 'px';
+      el.style.top = tile.y + 'px';
+      el.style.width = tile.w + 'px';
+      el.style.height = tile.h + 'px';
+
+      const imgEl = el.querySelector('img');
+      imgEl.style.objectPosition = `${tile.img.panX}% ${tile.img.panY}%`;
+    });
+
+    // Remove tiles no longer in layout
+    existingEls.forEach(el => {
+      if (!usedIds.has(el.dataset.id)) {
+        el.remove();
+      }
+    });
+  }
+
+  // ── Pan (drag to adjust focus) ──
+  function setupPan(el, imgData) {
+    const handle = el.querySelector('.drag-handle');
+    let dragging = false;
+    let startX, startY, startPanX, startPanY;
+
+    handle.addEventListener('pointerdown', e => {
+      dragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      startPanX = imgData.panX;
+      startPanY = imgData.panY;
+      handle.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+
+    handle.addEventListener('pointermove', e => {
+      if (!dragging) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      // Convert pixel movement to percentage offset
+      const rect = el.getBoundingClientRect();
+      imgData.panX = clamp(startPanX - (dx / rect.width) * 60, 0, 100);
+      imgData.panY = clamp(startPanY - (dy / rect.height) * 60, 0, 100);
+      const imgEl = el.querySelector('img');
+      imgEl.style.objectPosition = `${imgData.panX}% ${imgData.panY}%`;
+    });
+
+    handle.addEventListener('pointerup', () => { dragging = false; });
+    handle.addEventListener('pointercancel', () => { dragging = false; });
+  }
+
+  function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+
+  // ── Shuffle utility ──
+  function shuffleArray(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+  }
+
+  // ── Events ──
+  // Drop zone
+  dropZone.addEventListener('click', () => fileInput.click());
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    handleFiles(e.dataTransfer.files);
+  });
+
+  // Also allow drop on the whole page once mosaic is visible
+  document.addEventListener('dragover', e => e.preventDefault());
+  document.addEventListener('drop', e => {
+    e.preventDefault();
+    if (e.target.closest('#drop-zone')) return;
+    handleFiles(e.dataTransfer.files);
+  });
+
+  fileInput.addEventListener('change', e => {
+    handleFiles(e.target.files);
+    fileInput.value = '';
+  });
+
+  // Controls
+  chaosSlider.addEventListener('input', e => {
+    chaos = parseInt(e.target.value) / 100;
+    render();
+  });
+
+  gapSlider.addEventListener('input', e => {
+    gap = parseInt(e.target.value);
+    document.documentElement.style.setProperty('--gap', gap + 'px');
+    render();
+  });
+
+  shuffleBtn.addEventListener('click', () => {
+    shuffleArray(layoutOrder);
+    render();
+  });
+
+  addBtn.addEventListener('click', () => fileInput.click());
+
+  // Resize
+  window.addEventListener('resize', () => render());
+
+  // ── Download / Export ──
+  downloadBtn.addEventListener('click', async () => {
+    if (!images.length) return;
+
+    const EXPORT_W = 1920;
+    const EXPORT_H = 1080;
+
+    downloadBtn.disabled = true;
+    downloadBtn.querySelector('svg').style.opacity = '0.3';
+
+    // Recompute layout at export resolution
+    const srcW = window.innerWidth;
+    const srcH = window.innerHeight;
+    const scaleX = EXPORT_W / srcW;
+    const scaleY = EXPORT_H / srcH;
+
+    const tiles = computeLayout(); // uses current viewport dims
+
+    const canvas = document.createElement('canvas');
+    canvas.width = EXPORT_W;
+    canvas.height = EXPORT_H;
+    const ctx = canvas.getContext('2d');
+
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, EXPORT_W, EXPORT_H);
+
+    // Load all images as Image elements (they may already be cached)
+    const drawPromises = tiles.map(tile => new Promise(resolve => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        // Scale tile rect to export canvas
+        const dx = tile.x * scaleX;
+        const dy = tile.y * scaleY;
+        const dw = tile.w * scaleX;
+        const dh = tile.h * scaleY;
+
+        // Compute source crop based on pan (object-cover logic)
+        const imgAspect = img.naturalWidth / img.naturalHeight;
+        const tileAspect = dw / dh;
+
+        let sw, sh, sx, sy;
+        if (imgAspect > tileAspect) {
+          // Image wider than tile → crop sides
+          sh = img.naturalHeight;
+          sw = sh * tileAspect;
+          sx = (img.naturalWidth - sw) * (tile.img.panX / 100);
+          sy = 0;
+        } else {
+          // Image taller than tile → crop top/bottom
+          sw = img.naturalWidth;
+          sh = sw / tileAspect;
+          sx = 0;
+          sy = (img.naturalHeight - sh) * (tile.img.panY / 100);
+        }
+
+        ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
+        resolve();
+      };
+      img.onerror = resolve;
+      img.src = tile.img.url;
+    }));
+
+    await Promise.all(drawPromises);
+
+    // Trigger download
+    canvas.toBlob(blob => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `moodboard-${Date.now()}.jpg`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+
+      downloadBtn.disabled = false;
+      downloadBtn.querySelector('svg').style.opacity = '';
+    }, 'image/jpeg', 0.95);
+  });
+
+  // ── Background color ──
+  bgColorInput.addEventListener('input', e => {
+    bgColor = e.target.value;
+    bgColorSwatch.style.background = bgColor;
+    bgColorLabel.textContent = bgColor;
+    document.body.style.background = bgColor;
+    mosaic.style.background = bgColor;
+  });
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', e => {
+    if (e.key === ' ' || e.code === 'Space') {
+      e.preventDefault();
+      shuffleArray(layoutOrder);
+      render();
+    }
+  });
+})();
+</script>
+</body>
+</html>
