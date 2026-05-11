@@ -620,17 +620,16 @@
   downloadBtn.addEventListener('click', async () => {
     if (!images.length) return;
 
-    const EXPORT_W = 1920;
-    const EXPORT_H = 1080;
+    const dpr = window.devicePixelRatio || 1;
+    const EXPORT_W = Math.round(window.innerWidth * dpr);
+    const EXPORT_H = Math.round(window.innerHeight * dpr);
 
     downloadBtn.disabled = true;
     downloadBtn.querySelector('svg').style.opacity = '0.3';
 
-    // Recompute layout at export resolution
-    const srcW = window.innerWidth;
-    const srcH = window.innerHeight;
-    const scaleX = EXPORT_W / srcW;
-    const scaleY = EXPORT_H / srcH;
+    // Layout is already computed at viewport CSS pixels; scale up by dpr for crisp output
+    const scaleX = dpr;
+    const scaleY = dpr;
 
     const tiles = computeLayout(); // uses current viewport dims
 
